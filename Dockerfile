@@ -22,4 +22,6 @@ COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 COPY --from=build /workspace/helm-values-schemas helm-values-schemas
 
+EXPOSE 8080
+
 ENTRYPOINT ["/helm-values-schemas"]
