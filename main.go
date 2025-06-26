@@ -207,7 +207,7 @@ func handleSchemaRequest(w http.ResponseWriter, r *http.Request, cache *SchemaCa
 	// Check if schema is in cache
 	if schema, found := cache.Get(cacheKey); found {
 		log.Printf("Serving cached schema for: %s", valuesUrl)
-		w.Header().Set("Content-Type", "application/schema+json")
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		w.Write(schema)
 		return
@@ -234,7 +234,7 @@ func handleSchemaRequest(w http.ResponseWriter, r *http.Request, cache *SchemaCa
 	cache.Set(cacheKey, schema)
 
 	// Return the schema
-	w.Header().Set("Content-Type", "application/schema+json")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write(schema)
 }
