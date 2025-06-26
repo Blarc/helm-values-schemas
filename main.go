@@ -81,15 +81,32 @@ func downloadValuesFile(valuesUrl string) ([]byte, error) {
 	return body, nil
 }
 
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return err == nil && info.IsDir()
+}
+
 func generateJSONSchema(valuesUrl string, valuesContent []byte) ([]byte, error) {
-	tmpFile, err := os.CreateTemp("", "values-*.yaml")
+	// Ensure a temp directory exists (for scratch containers)
+	tmpDir := "/tmp"
+	if !dirExists(tmpDir) {
+		if err := os.MkdirAll(tmpDir, 0755); err != nil {
+			// If /tmp doesn't work, try the current directory
+			tmpDir = "."
+		}
+	}
+
+	tmpFile, err := os.CreateTemp(tmpDir, "values-*.yaml")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp file: %w", err)
 	}
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 
-	tmpSchemaFile, err := os.CreateTemp("", "values-*.schema.json")
+	tmpSchemaFile, err := os.CreateTemp(tmpDir, "values-*.schema.json")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp schema file: %w", err)
 	}
@@ -179,11 +196,17 @@ func handleSchemaRequest(w http.ResponseWriter, r *http.Request, cache *SchemaCa
 		return
 	}
 
+	if valuesUrl == "/favicon.ico" {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
 	// Create a cache key
 	cacheKey := valuesUrl
 
 	// Check if schema is in cache
 	if schema, found := cache.Get(cacheKey); found {
+		log.Printf("Serving cached schema for: %s", valuesUrl)
 		w.Header().Set("Content-Type", "application/schema+json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(schema)
@@ -199,9 +222,13 @@ func handleSchemaRequest(w http.ResponseWriter, r *http.Request, cache *SchemaCa
 		return
 	}
 
-	// TODO: Process valuesContent to generate JSON schema
-	// For now, we'll create a placeholder schema
 	schema, err := generateJSONSchema(valuesUrl, valuesContent)
+	if err != nil {
+		log.Printf("Error generating schema: %v", err)
+		sendErrorResponse(w, http.StatusInternalServerError, "schema_generation_failed",
+			fmt.Sprintf("Failed to generate JSON schema: %v", err))
+		return
+	}
 
 	// Cache the result
 	cache.Set(cacheKey, schema)
